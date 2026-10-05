@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Flying Plane Game</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        touch-action: manipulation;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(to bottom, #87ceeb, #e0f7fa);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #333;
+      }
+
+      #gameContainer {
+        position: relative;
+        width: 100%;
+        max-width: 400px;
+        height: 80vh;
+        margin: 0 auto;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      #gameCanvas {
+        background: linear-gradient(to bottom, #87ceeb 70%, #8b4513 70%);
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      #uiOverlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #scoreDisplay {
+        position: absolute;
+        top: 20px;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        color: white;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      }
+
+      #startScreen,
+      #gameOverScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        text-align: center;
+        padding: 20px;
+        pointer-events: auto;
+      }
+
+      #gameOverScreen {
+        display: none;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 20px;
+        color: #ffd700;
+      }
+
+      p {
+        font-size: 18px;
+        margin-bottom: 10px;
+        max-width: 90%;
+      }
+
+      #finalScore {
+        font-size: 24px;
+        margin: 10px 0;
+        color: #ffd700;
+      }
+
+      button {
+        background: #4caf50;
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        font-size: 18px;
+        border-radius: 50px;
+        cursor: pointer;
+        margin-top: 20px;
+        pointer-events: auto;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s;
+      }
+
+      button:hover {
+        background: #45a049;
+        transform: scale(1.05);
+      }
+
+      #instructions {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+      }
+
+      .mobile-controls {
+        position: absolute;
+        bottom: 20px;
+        width: 100%;
+        display: flex;
+        justify-content: space-around;
+        padding: 0 20px;
+      }
+
+      .control-btn {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        color: white;
+        cursor: pointer;
+        user-select: none;
+        pointer-events: auto;
+      }
+
+      .control-btn:active {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 24px;
+        }
+
+        p {
+          font-size: 16px;
+        }
+
+        #finalScore {
+          font-size: 20px;
+        }
+
+        button {
+          padding: 12px 24px;
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="gameContainer">
+      <canvas id="gameCanvas"></canvas>
+
+      <div id="uiOverlay">
+        <div id="scoreDisplay">Score: 0</div>
+
+        <div id="startScreen">
+          <h1>Flying Plane Game</h1>
+          <div id="instructions">
+            <p>Tap or click to make the plane fly upward</p>
+            <p>Avoid obstacles and collect coins!</p>
+          </div>
+          <button id="startButton">Start Game</button>
+        </div>
+
+        <div id="gameOverScreen">
+          <h1>Game Over</h1>
+          <p>Your final score:</p>
+          <div id="finalScore">0</div>
+          <button id="restartButton">Play Again</button>
+        </div>
+
+        <div class="mobile-controls">
+          <div class="control-btn" id="upButton">↑</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Game variables
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const scoreDisplay = document.getElementById("scoreDisplay");
+      const startScreen = document.getElementById("startScreen");
+      const gameOverScreen = document.getElementById("gameOverScreen");
+      const finalScore = document.getElementById("finalScore");
+      const startButton = document.getElementById("startButton");
+      const restartButton = document.getElementById("restartButton");
+      const upButton = document.getElementById("upButton");
+
+      // Set canvas dimensions
+      function resizeCanvas() {
+        const container = canvas.parentElement;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+      }
+
+      // Initial resize
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+
+      // Game state
+      let gameState = {
+        plane: {
+          x: 100,
+          y: canvas.height / 2,
+          width: 50,
+          height: 30,
+          velocity: 0,
+          gravity: 0.5,
+          lift: -8,
+          rotation: 0,
+        },
+        obstacles: [],
+        coins: [],
+        clouds: [],
+        score: 0,
+        gameRunning: false,
+        lastObstacleTime: 0,
+        lastCoinTime: 0,
+        obstacleInterval: 1500, // milliseconds
+        coinInterval: 2000, // milliseconds
+      };
+
+      // Create a cloud
+      function createCloud() {
+        return {
+          x: canvas.width,
+          y: Math.random() * (canvas.height / 2),
+          width: 60 + Math.random() * 40,
+          height: 30 + Math.random() * 20,
+          speed: 0.5 + Math.random() * 1,
+        };
+      }
+
+      // Create an obstacle
+      function createObstacle() {
+        const gapSize = 150 + Math.random() * 50;
+        const gapPosition =
+          Math.random() * (canvas.height - gapSize - 100) + 50;
+
+        return {
+          x: canvas.width,
+          gapPosition: gapPosition,
+          gapSize: gapSize,
+          width: 60,
+          speed: 3 + Math.random() * 2,
+        };
+      }
+
+      // Create a coin
+      function createCoin() {
+        return {
+          x: canvas.width,
+          y: 50 + Math.random() * (canvas.height - 100),
+          radius: 10,
+          speed: 3 + Math.random() * 2,
+          collected: false,
+        };
+      }
+
+      // Draw the plane
+      function drawPlane() {
+        ctx.save();
+        ctx.translate(
+          gameState.plane.x + gameState.plane.width / 2,
+          gameState.plane.y + gameState.plane.height / 2,
+        );
+        ctx.rotate(gameState.plane.rotation);
+
+        // Draw plane body
+        ctx.fillStyle = "#FF4136";
+        ctx.fillRect(
+          -gameState.plane.width / 2,
+          -gameState.plane.height / 2,
+          gameState.plane.width,
+          gameState.plane.height,
+        );
+
+        // Draw wings
+        ctx.fillStyle = "#FF851B";
+        ctx.fillRect(
+          -gameState.plane.width / 2,
+          -gameState.plane.height / 2 + 5,
+          gameState.plane.width,
+          10,
+        );
+
+        // Draw tail
+        ctx.fillStyle = "#FF4136";
+        ctx.fillRect(
+          -gameState.plane.width / 2 - 10,
+          -gameState.plane.height / 2 + 5,
+          10,
+          10,
+        );
+
+        ctx.restore();
+      }
+
+      // Draw obstacles
+      function drawObstacles() {
+        gameState.obstacles.forEach((obstacle) => {
+          // Top obstacle
+          ctx.fillStyle = "#2E8B57";
+          ctx.fillRect(obstacle.x, 0, obstacle.width, obstacle.gapPosition);
+
+          // Bottom obstacle
+          ctx.fillRect(
+            obstacle.x,
+            obstacle.gapPosition + obstacle.gapSize,
+            obstacle.width,
+            canvas.height,
+          );
+
+          // Draw obstacle caps
+          ctx.fillStyle = "#3CB371";
+          ctx.fillRect(
+            obstacle.x - 5,
+            obstacle.gapPosition - 10,
+            obstacle.width + 10,
+            10,
+          );
+          ctx.fillRect(
+            obstacle.x - 5,
+            obstacle.gapPosition + obstacle.gapSize,
+            obstacle.width + 10,
+            10,
+          );
+        });
+      }
+
+      // Draw coins
+      function drawCoins() {
+        gameState.coins.forEach((coin) => {
+          if (!coin.collected) {
+            ctx.fillStyle = "#FFD700";
+            ctx.beginPath();
+            ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw coin shine
+            ctx.fillStyle = "#FFFFFF";
+            ctx.beginPath();
+            ctx.arc(
+              coin.x - coin.radius / 3,
+              coin.y - coin.radius / 3,
+              coin.radius / 3,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fill();
+          }
+        });
+      }
+
+      // Draw clouds
+      function drawClouds() {
+        gameState.clouds.forEach((cloud) => {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.beginPath();
+          ctx.arc(cloud.x, cloud.y, cloud.width / 4, 0, Math.PI * 2);
+          ctx.arc(
+            cloud.x + cloud.width / 4,
+            cloud.y - cloud.height / 4,
+            cloud.width / 5,
+            0,
+            Math.PI * 2,
+          );
+          ctx.arc(
+            cloud.x + cloud.width / 2,
+            cloud.y,
+            cloud.width / 4,
+            0,
+            Math.PI * 2,
+          );
+          ctx.arc(
+            cloud.x + cloud.width / 3,
+            cloud.y + cloud.height / 4,
+            cloud.width / 5,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+        });
+      }
+
+      // Update game state
+      function updateGame() {
+        if (!gameState.gameRunning) return;
+
+        // Update plane
+        gameState.plane.velocity += gameState.plane.gravity;
+        gameState.plane.y += gameState.plane.velocity;
+
+        // Rotate plane based on velocity
+        gameState.plane.rotation = gameState.plane.velocity * 0.05;
+
+        // Keep plane within bounds
+        if (gameState.plane.y < 0) {
+          gameState.plane.y = 0;
+          gameState.plane.velocity = 0;
+        }
+
+        if (gameState.plane.y + gameState.plane.height > canvas.height) {
+          gameState.plane.y = canvas.height - gameState.plane.height;
+          gameState.plane.velocity = 0;
+          gameOver();
+        }
+
+        // Update clouds
+        gameState.clouds.forEach((cloud) => {
+          cloud.x -= cloud.speed;
+          if (cloud.x + cloud.width < 0) {
+            cloud.x = canvas.width + cloud.width;
+            cloud.y = Math.random() * (canvas.height / 2);
+          }
+        });
+
+        // Generate new clouds
+        if (gameState.clouds.length < 5) {
+          const cloud = createCloud();
+          cloud.x = canvas.width + Math.random() * 100;
+          gameState.clouds.push(cloud);
+        }
+
+        // Update obstacles
+        gameState.obstacles.forEach((obstacle, index) => {
+          obstacle.x -= obstacle.speed;
+
+          // Remove obstacles that are off screen
+          if (obstacle.x + obstacle.width < 0) {
+            gameState.obstacles.splice(index, 1);
+            gameState.score += 10;
+            scoreDisplay.textContent = `Score: ${gameState.score}`;
+          }
+        });
+
+        // Update coins
+        gameState.coins.forEach((coin, index) => {
+          coin.x -= coin.speed;
+
+          // Remove coins that are off screen
+          if (coin.x + coin.radius < 0) {
+            gameState.coins.splice(index, 1);
+          }
+
+          // Check for coin collection
+          else if (!coin.collected) {
+            const dx = gameState.plane.x + gameState.plane.width / 2 - coin.x;
+            const dy = gameState.plane.y + gameState.plane.height / 2 - coin.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < gameState.plane.width / 2 + coin.radius) {
+              coin.collected = true;
+              gameState.score += 50;
+              scoreDisplay.textContent = `Score: ${gameState.score}`;
+            }
+          }
+        });
+
+        // Generate new obstacles
+        const now = Date.now();
+        if (now - gameState.lastObstacleTime > gameState.obstacleInterval) {
+          gameState.obstacles.push(createObstacle());
+          gameState.lastObstacleTime = now;
+        }
+
+        // Generate new coins
+        if (now - gameState.lastCoinTime > gameState.coinInterval) {
+          gameState.coins.push(createCoin());
+          gameState.lastCoinTime = now;
+        }
+
+        // Check collisions with obstacles
+        const planeRect = {
+          x: gameState.plane.x,
+          y: gameState.plane.y,
+          width: gameState.plane.width,
+          height: gameState.plane.height,
+        };
+
+        for (let i = 0; i < gameState.obstacles.length; i++) {
+          const obstacle = gameState.obstacles[i];
+
+          // Check if plane is in the gap
+          if (
+            planeRect.x + planeRect.width > obstacle.x &&
+            planeRect.x < obstacle.x + obstacle.width &&
+            (planeRect.y < obstacle.gapPosition ||
+              planeRect.y + planeRect.height >
+                obstacle.gapPosition + obstacle.gapSize)
+          ) {
+            gameOver();
+            break;
+          }
+        }
+      }
+
+      // Draw everything
+      function draw() {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw background
+        ctx.fillStyle = "#87CEEB";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw clouds
+        drawClouds();
+
+        // Draw obstacles
+        drawObstacles();
+
+        // Draw coins
+        drawCoins();
+
+        // Draw plane
+        drawPlane();
+
+        // Draw score
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.font = "bold 24px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(`Score: ${game.score}`, canvas.width / 2, 50);
+
+        // Draw high score
+        ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+        ctx.font = "16px Arial";
+        ctx.fillText(`High: ${game.highScore}`, canvas.width / 2, 75);
+
+        // Draw game over screen
+        if (game.gameOver) {
+          ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 48px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 50);
+
+          ctx.font = "24px Arial";
+          ctx.fillText(
+            `Score: ${game.score}`,
+            canvas.width / 2,
+            canvas.height / 2,
+          );
+
+          ctx.font = "20px Arial";
+          ctx.fillText(
+            `High Score: ${game.highScore}`,
+            canvas.width / 2,
+            canvas.height / 2 + 40,
+          );
+
+          ctx.font = "18px Arial";
+          ctx.fillText(
+            "Tap to restart",
+            canvas.width / 2,
+            canvas.height / 2 + 80,
+          );
+        }
+      }
+
+      function gameOver() {
+        game.gameOver = true;
+        game.velocity = 0;
+
+        // Update high score
+        if (game.score > game.highScore) {
+          game.highScore = game.score;
+          try {
+            localStorage.setItem("planeGameHighScore", game.highScore);
+          } catch (e) {
+            // localStorage not available
+          }
+        }
+
+        // Play game over sound
+        playSound(200, 0.3, "sine", 0.5);
+      }
+
+      function startGame() {
+        game.score = 0;
+        game.velocity = 0;
+        game.gameOver = false;
+        game.plane.y = canvas.height / 2;
+        game.plane.rotation = 0;
+        game.obstacles = [];
+        game.coins = [];
+        game.clouds = [];
+
+        // Create initial clouds
+        for (let i = 0; i < 5; i++) {
+          game.clouds.push(createCloud(Math.random() * canvas.width));
+        }
+      }
+
+      function gameLoop() {
+        updateGame();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      // Input handlers
+      function flap() {
+        if (game.gameOver) {
+          startGame();
+        } else {
+          game.velocity = -8;
+          playSound(440, 0.1, "sine", 0.3);
+        }
+      }
+
+      canvas.addEventListener("click", flap);
+      canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        flap();
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space" || e.code === "ArrowUp") {
+          e.preventDefault();
+          flap();
+        }
+      });
+
+      // Start the game loop
+      resizeCanvas();
+      startGame();
+      gameLoop();
+    </script>
+  </body>
+</html>
+```
